@@ -1,0 +1,521 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>NiYoj</title>
+<style>
+  :root{
+    --bg:#0b0f16; --panel:#111823; --panel2:#0e141d; --card:#131c28; --line:#1e293b;
+    --ink:#e2e8f0; --dim:#8296b0; --faint:#5a6b83;
+    --accent:#3ddc84; --amber:#f5b942; --red:#f0616d; --blue:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);color:var(--ink);overflow:hidden;user-select:none;
+    font:13.5px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+    display:flex;flex-direction:column;
+  }
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+  input,select{font:inherit}
+  .grow{flex:1}
+
+  header{
+    display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;flex:none;
+    background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  .logo{display:flex;align-items:center;gap:9px;font-weight:600}
+  .logo svg{width:24px;height:24px;display:block;border-radius:7px}
+  .btn{padding:6px 12px;border-radius:7px;border:1px solid var(--line);
+       background:var(--panel2);transition:.13s;white-space:nowrap}
+  .btn:hover{background:#18212e;border-color:#2c3d55}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.pri{background:var(--accent);color:#052b13;border-color:transparent;font-weight:600}
+  .btn.pri:hover{background:#4ef295}
+  .btn.danger:hover{background:#2a1418;border-color:#5b2630;color:var(--red)}
+  .btn.sm{padding:4px 10px;font-size:12.5px}
+
+  main{flex:1;display:flex;min-height:0}
+  aside{width:250px;flex:none;background:var(--panel2);border-right:1px solid var(--line);
+        display:flex;flex-direction:column}
+  .cap{padding:14px 14px 7px;font-size:10.5px;letter-spacing:.9px;
+       text-transform:uppercase;color:var(--faint)}
+  .servers{flex:1;overflow:auto;padding:0 8px 10px}
+  .sv{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;
+      cursor:pointer;transition:.1s;margin-bottom:3px}
+  .sv:hover{background:#151d29}
+  .sv.on{background:#172333;box-shadow:inset 2px 0 0 var(--accent)}
+  .sv .t{flex:1;min-width:0}
+  .sv b{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sv small{color:var(--faint);font:11.5px ui-monospace,Consolas,monospace}
+  .sv .n{font-size:11px;color:var(--faint)}
+  .addsv{width:calc(100% - 16px);margin:0 8px 10px;padding:7px;border-radius:8px;
+         border:1px dashed var(--line);color:var(--dim)}
+  .addsv:hover{border-color:#2c3d55;color:var(--ink)}
+
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--faint)}
+  .dot.ok{background:var(--accent);box-shadow:0 0 6px #3ddc8455}
+  .dot.fail{background:var(--red);box-shadow:0 0 6px #f0616d55}
+  .dot.run{background:var(--amber);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.25}}
+
+  section{flex:1;display:flex;flex-direction:column;min-width:0}
+  .shead{padding:15px 20px 13px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .stitle{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .stitle h1{margin:0;font-size:18px;font-weight:650}
+  .chip{padding:2.5px 9px;border-radius:20px;font-size:11px;background:#16202d;
+        border:1px solid var(--line);color:var(--dim)}
+  .chip.mono{font-family:ui-monospace,Consolas,monospace}
+  .chip.ok{color:var(--accent);border-color:#1c5236}
+  .chip.fail{color:var(--red);border-color:#5b2630}
+  .acts{display:flex;gap:8px;align-items:center}
+  .acts input{padding:5px 10px;border-radius:7px;background:var(--bg);width:170px;
+              border:1px solid var(--line);color:var(--ink);outline:none}
+  .acts input:focus{border-color:#31506f}
+
+  .cards{flex:1;overflow:auto;padding:16px 20px;display:grid;gap:13px;align-content:start;
+         grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:13px 14px;
+        display:flex;flex-direction:column;gap:9px;transition:.13s}
+  .card:hover{border-color:#2c3d55;transform:translateY(-1px)}
+  .card .top{display:flex;align-items:center;gap:8px}
+  .card h3{margin:0;font-size:14.5px;font-weight:640;flex:1;overflow:hidden;
+           text-overflow:ellipsis;white-space:nowrap}
+  .card .br{font-size:11px;color:var(--faint);font-family:ui-monospace,Consolas,monospace}
+  .card .meta{font:11.5px/1.6 ui-monospace,Consolas,monospace;color:var(--faint);min-width:0}
+  .card .meta div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card .st{font-size:11.5px;color:var(--dim)}
+  .card .st.ok{color:var(--accent)} .card .st.fail{color:var(--red)}
+  .card .st.run{color:var(--amber)}
+  .card .row{display:flex;gap:6px;margin-top:auto}
+  .card .row .btn{flex:none}
+  .card .row .btn.pri{flex:1}
+
+  .empty{margin:auto;text-align:center;color:var(--faint);padding:40px;grid-column:1/-1}
+  .empty h2{color:var(--dim);font-weight:600;margin:0 0 6px}
+
+  .scrim{position:fixed;inset:0;background:#050810cc;backdrop-filter:blur(3px);
+         display:grid;place-items:center;z-index:50}
+  .modal{width:430px;max-height:88vh;overflow:auto;background:var(--panel);
+         border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 18px 50px #000a}
+  .modal.wide{width:620px}
+  .modal.log{width:min(880px,92vw);padding:0;overflow:hidden;display:flex;flex-direction:column}
+  .modal h2{margin:0 0 16px;font-size:15.5px;font-weight:650}
+  .f{margin-bottom:12px}
+  .f label{display:block;font-size:11px;letter-spacing:.5px;color:var(--dim);margin-bottom:4px}
+  .f input,.f select{width:100%;padding:8px 10px;border-radius:7px;background:var(--bg);
+                     border:1px solid var(--line);color:var(--ink);outline:none}
+  .f input:focus,.f select:focus{border-color:#31506f}
+  .f .hint{font-size:11px;color:var(--faint);margin-top:4px}
+  .f .with{display:flex;gap:6px}
+  .foot{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:18px}
+  .err{font-size:12px;min-height:16px;margin-top:-4px;color:var(--red)}
+  .err.good{color:var(--accent)}
+
+  .loghead{display:flex;align-items:center;gap:10px;padding:13px 16px;
+           border-bottom:1px solid var(--line);background:var(--panel)}
+  .loghead h2{margin:0}
+  .console{flex:1;margin:0;padding:14px 16px;overflow:auto;background:#05080d;height:56vh;
+           font:12.5px/1.65 ui-monospace,Consolas,monospace;white-space:pre-wrap;
+           word-break:break-word;user-select:text}
+  .console .cmd{color:var(--blue)} .console .sub{color:var(--faint)}
+  .console .ok{color:var(--accent);font-weight:600}
+  .console .bad{color:var(--red);font-weight:600}
+
+  .scan{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:8px;
+        border:1px solid var(--line);margin-bottom:7px;cursor:pointer;background:var(--panel2)}
+  .scan:hover{border-color:#2c3d55}
+  .scan.known{opacity:.6}
+  .scan input{margin-top:3px;accent-color:var(--accent)}
+  .scan .path{font:11.5px/1.5 ui-monospace,Consolas,monospace;color:var(--faint);
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tag{font-size:10px;padding:1px 6px;border-radius:10px;margin-left:5px;
+       background:#16202d;border:1px solid var(--line);color:var(--dim)}
+  .tag.ok{color:var(--accent);border-color:#1c5236}
+  .tag.warn{color:var(--amber);border-color:#5b4620}
+  .tag.live{color:var(--blue);border-color:#24456e}
+
+  #toast{position:fixed;bottom:18px;left:50%;transform:translate(-50%,60px);z-index:99;
+         background:var(--panel);border:1px solid var(--line);border-radius:8px;
+         padding:9px 15px;box-shadow:0 8px 26px #000a;opacity:0;transition:.22s}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast.bad{border-color:#5b2630;color:var(--red)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 1024 1024" aria-hidden="true">
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#3ddc84"/><stop offset="1" stop-color="#2f7bf0"/>
+      </linearGradient></defs>
+      <rect width="1024" height="1024" rx="232" fill="url(#lg)"/>
+      <g fill="none" stroke="#fff" stroke-width="112" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M288 516 L512 292 L736 516"/><path d="M512 330 L512 632"/>
+        <path d="M320 818 L704 818"/>
+      </g>
+    </svg>
+    NiYoj
+  </div>
+  <div class="grow"></div>
+  <button class="btn" onclick="serverModal()">+ Server</button>
+  <button class="btn" onclick="appModal()">+ App</button>
+</header>
+
+<main>
+  <aside>
+    <div class="cap">Servers</div>
+    <div class="servers" id="servers"></div>
+    <button class="addsv" onclick="serverModal()">+ Add server</button>
+  </aside>
+  <section id="pane"></section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+let S = {servers:{}, apps:{}};
+let sv = null;          // selected server
+let running = {};       // app -> true while deploying
+let logs = {};          // app -> html
+let logOpen = null;     // app whose log popup is showing
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const appsOf = s => Object.entries(S.apps).filter(([,a]) => a.server === s);
+
+function toast(msg, bad){
+  const t=$('toast'); t.textContent=msg; t.className='show'+(bad?' bad':'');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2800);
+}
+
+async function boot(){
+  S = await pywebview.api.get_state();
+  if(!sv || !S.servers[sv]) sv = Object.keys(S.servers)[0] || null;
+  render();
+}
+
+/* ── servers rail ────────────────────────────────── */
+function render(){
+  const L = $('servers'); L.innerHTML='';
+  for(const [name,s] of Object.entries(S.servers)){
+    const busy = appsOf(name).some(([n]) => running[n]);
+    const cls = busy ? 'run' : (s.last ? (s.last.status==='ok'?'ok':'fail') : '');
+    const d = document.createElement('div');
+    d.className = 'sv'+(name===sv?' on':'');
+    d.onclick = ()=>{ sv=name; render(); };
+    d.innerHTML = `<span class="dot ${cls}"></span>
+      <span class="t"><b>${esc(name)}</b><small>${esc(s.host||'')}</small></span>
+      <span class="n">${appsOf(name).length}</span>`;
+    L.appendChild(d);
+  }
+  pane();
+}
+
+/* ── app cards ───────────────────────────────────── */
+function stateOf(n){
+  if(running[n]) return ['run','deploying…'];
+  const l = S.apps[n] && S.apps[n].last;
+  if(!l) return ['','never deployed'];
+  return [l.status==='ok'?'ok':'fail', (l.status==='ok'?'deployed ':'failed ')+l.at];
+}
+
+function pane(){
+  const P = $('pane');
+  if(!Object.keys(S.servers).length){
+    P.innerHTML = `<div class="empty" style="margin:auto"><h2>Welcome</h2>
+      <p>Add the droplet you deploy to, then scan it for apps.</p>
+      <button class="btn pri" onclick="serverModal()">Add a server</button></div>`;
+    return;
+  }
+  const s = S.servers[sv] || {};
+  const st = s.last ? (s.last.status==='ok'?'ok':'fail') : '';
+  P.innerHTML = `
+    <div class="shead">
+      <div class="stitle">
+        <h1>${esc(sv)}</h1>
+        <span class="chip mono">${esc(s.user||'root')}@${esc(s.host||'')}:${esc(s.port||22)}</span>
+        ${s.last?`<span class="chip ${st}">${s.last.status==='ok'?'reachable':'unreachable'} · ${esc(s.last.at)}</span>`:''}
+      </div>
+      <div class="acts">
+        <button class="btn sm" onclick="testServer()">Test connection</button>
+        <button class="btn sm" onclick="scanModal(sv)">Scan for apps</button>
+        <button class="btn sm" onclick="serverModal(sv)">Edit server</button>
+        <button class="btn sm" onclick="appModal()">+ App</button>
+        <div class="grow"></div>
+        <input id="q" placeholder="Filter apps…" oninput="cards()">
+      </div>
+    </div>
+    <div class="cards" id="cards"></div>`;
+  cards();
+}
+
+function cards(){
+  const C = $('cards'); if(!C) return;
+  const q = ($('q')?$('q').value:'').toLowerCase();
+  const list = appsOf(sv).filter(([n]) => n.toLowerCase().includes(q));
+  if(!list.length){
+    C.innerHTML = `<div class="empty"><h2>${appsOf(sv).length?'No match':'No apps yet'}</h2>
+      <p>${appsOf(sv).length?'Nothing matches that filter.':
+        'Scan the droplet to pull in what is already deployed, or add one by hand.'}</p>
+      ${appsOf(sv).length?'':`<button class="btn pri" onclick="scanModal(sv)">Scan for apps</button>
+      <button class="btn" onclick="appModal()">Add manually</button>`}</div>`;
+    return;
+  }
+  C.innerHTML = list.map(([n,a])=>{
+    const [cls,txt] = stateOf(n);
+    return `<div class="card">
+      <div class="top"><span class="dot ${cls}"></span><h3>${esc(n)}</h3>
+        <span class="br">${esc(a.branch||'main')}</span></div>
+      <div class="meta">
+        <div title="${esc(a.dir)}">${esc(a.dir||'—')}</div>
+        <div title="${esc(a.repo)}">${esc(a.repo||'no repo set')}</div>
+      </div>
+      <div class="st ${cls}">${esc(txt)}</div>
+      <div class="row">
+        <button class="btn pri sm" ${running[n]?'disabled':''}
+          onclick="deploy('${esc(n)}')">${running[n]?'Deploying…':'Deploy'}</button>
+        <button class="btn sm" onclick="showLog('${esc(n)}')">Log</button>
+        <button class="btn sm" onclick="appModal('${esc(n)}')">Edit</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── deploy + log popup ──────────────────────────── */
+function deploy(n){
+  if(running[n]) return;
+  running[n]=true; logs[n]=''; render(); showLog(n);
+  pywebview.api.deploy(n);
+}
+function showLog(n){
+  logOpen = n;
+  const [cls,txt] = stateOf(n);
+  openModal(`
+    <div class="loghead"><span class="dot ${cls}"></span><h2>${esc(n)}</h2>
+      <span class="chip ${cls==='ok'||cls==='fail'?cls:''}" id="logst">${esc(txt)}</span>
+      <div class="grow"></div>
+      <button class="btn sm" onclick="logs['${esc(n)}']='';paintLog()">Clear</button>
+      <button class="btn sm" onclick="closeModal()">Close</button></div>
+    <pre class="console" id="con"></pre>`, 'log');
+  paintLog();
+}
+function paintLog(){
+  const c=$('con'); if(!c||!logOpen) return;
+  c.innerHTML = logs[logOpen] || '<span class="sub">Waiting for output…</span>';
+  c.scrollTop = c.scrollHeight;
+}
+// called from Python for every line of output
+function logLine(app, line){
+  let cls='';
+  if(line.startsWith('$ ')) cls='cmd';
+  else if(line.startsWith('| ')||line.startsWith('---')) cls='sub';
+  else if(line.includes('=== ')) cls = line.includes(': OK') ? 'ok' : 'bad';
+  logs[app] = (logs[app]||'') + (cls?`<span class="${cls}">${esc(line)}</span>`:esc(line));
+  if(app!==logOpen) return;
+  const c=$('con'); if(!c) return;
+  const stick = c.scrollHeight - c.scrollTop - c.clientHeight < 40;   // respect scroll-up
+  c.innerHTML = logs[app];
+  if(stick) c.scrollTop = c.scrollHeight;
+}
+async function deployDone(app){
+  delete running[app];
+  S = await pywebview.api.get_state();
+  render();
+  if(logOpen===app){
+    const [cls,txt] = stateOf(app);
+    const el=$('logst'); if(el){ el.textContent=txt; el.className='chip '+cls; }
+  }
+}
+
+/* ── modals ──────────────────────────────────────── */
+function closeModal(){
+  const s=document.querySelector('.scrim');
+  if(s){ if(s.querySelector('.modal.log')) logOpen=null; s.remove(); }
+}
+function openModal(html, cls){
+  closeModal();
+  const d=document.createElement('div'); d.className='scrim';
+  d.innerHTML=`<div class="modal ${cls||''}">${html}</div>`;
+  d.onmousedown = e => { if(e.target===d) closeModal(); };
+  document.body.appendChild(d);
+  const i=d.querySelector('input:not([type=checkbox])'); if(i) i.focus();
+  d.querySelectorAll('.f input').forEach(el=>el.onkeydown=e=>{
+    if(e.key==='Enter') d.querySelector('.btn.pri').click();
+  });
+}
+const val = id => $(id).value.trim();
+
+/* servers */
+function serverModal(name){
+  const s = name ? S.servers[name] : {port:22,user:'root',key:'~/.ssh/id_ed25519'};
+  openModal(`
+    <h2>${name?'Edit server':'Add a server'}</h2>
+    <div class="f"><label>Name</label>
+      <input id="s_name" value="${esc(name||'')}" placeholder="droplet-1"></div>
+    <div class="f"><label>Host / IP</label>
+      <input id="s_host" value="${esc(s.host||'')}" placeholder="203.0.113.10"></div>
+    <div class="f" style="display:flex;gap:10px">
+      <div style="flex:2"><label>SSH user</label><input id="s_user" value="${esc(s.user||'root')}"></div>
+      <div style="flex:1"><label>Port</label><input id="s_port" value="${esc(s.port||22)}"></div>
+    </div>
+    <div class="f"><label>Private key</label>
+      <div class="with"><input id="s_key" value="${esc(s.key||'')}">
+        <button class="btn" onclick="pickKey()">Browse</button></div>
+      <div class="hint">Pick the file with no <code>.pub</code>. Key login only — no password
+        prompts, so a deploy can never hang.</div></div>
+    <div class="err" id="err"></div>
+    <div class="foot">
+      ${name?`<button class="btn danger" onclick="delServer('${esc(name)}')">Delete</button>`:''}
+      <button class="btn" id="tbtn" onclick="testForm('${esc(name||'')}')">Test connection</button>
+      <div class="grow"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="saveServer('${esc(name||'')}')">Save</button>
+    </div>`);
+}
+function formServer(){
+  return {host:val('s_host'), user:val('s_user')||'root',
+          port:parseInt(val('s_port')||'22',10)||22, key:val('s_key')};
+}
+async function pickKey(){ const p = await pywebview.api.pick_key(); if(p) $('s_key').value = p; }
+
+async function testForm(name){
+  if(!val('s_host')) return $('err').textContent='Enter a host first.';
+  const b=$('tbtn'); b.disabled=true; b.textContent='Testing…';
+  $('err').className='err'; $('err').textContent='Connecting…';
+  const r = await pywebview.api.test_conn(formServer(), name);
+  b.disabled=false; b.textContent='Test connection';
+  $('err').className = 'err'+(r.ok?' good':'');
+  $('err').textContent = r.ok ? '✓ Connected — '+r.msg : '✗ '+r.msg;
+  if(r.ok && name) S = await pywebview.api.get_state();
+}
+async function testServer(){
+  toast('Testing '+sv+'…');
+  const r = await pywebview.api.test_conn(S.servers[sv], sv);
+  toast(r.ok ? '✓ '+sv+' reachable — '+r.msg : '✗ '+r.msg, !r.ok);
+  await boot();
+}
+async function saveServer(old){
+  if(!val('s_name')||!val('s_host')) return $('err').textContent='Name and host are required.';
+  const r = await pywebview.api.save_server(old, val('s_name'), formServer());
+  if(!r.ok) return $('err').textContent = r.msg;
+  closeModal(); sv = val('s_name'); toast('Server saved'); await boot();
+}
+async function delServer(name){
+  const used = appsOf(name).length;
+  if(used) return $('err').textContent = `${used} app(s) still use this server.`;
+  await pywebview.api.delete_server(name); closeModal(); sv=null;
+  toast('Server deleted'); await boot();
+}
+
+/* scan */
+let found = [];
+async function scanModal(s){
+  openModal(`<h2>Scanning ${esc(s)}…</h2>
+    <p style="color:var(--dim);margin:0">Looking through /opt, /srv, /var/www, /root and /home
+      for git checkouts.</p>`);
+  const r = await pywebview.api.scan_server(s);
+  if(!r.ok){ closeModal(); return toast(r.msg, true); }
+  found = r.rows;
+  if(!found.length){
+    return openModal(`<h2>Nothing found on ${esc(s)}</h2>
+      <p style="color:var(--dim)">No git checkouts under /opt, /srv, /var/www, /root or /home.
+        Apps deployed elsewhere need adding by hand.</p>
+      <div class="foot"><button class="btn pri" onclick="closeModal()">Close</button></div>`);
+  }
+  openModal(`<h2>Found ${found.length} app${found.length>1?'s':''} on ${esc(s)}</h2>
+    <div style="max-height:46vh;overflow:auto;margin:-4px -4px 0;padding:4px">
+      ${found.map((a,i)=>`
+        <label class="scan ${a.known?'known':''}">
+          <input type="checkbox" ${a.known?'':'checked'} data-i="${i}">
+          <div style="flex:1;min-width:0">
+            <div><b>${esc(a.name)}</b>
+              ${a.known?'<span class="tag">already listed</span>':''}
+              ${a.up?'<span class="tag live">running</span>':''}
+              ${a.deploy_sh?'<span class="tag ok">deploy.sh</span>':'<span class="tag warn">no deploy.sh</span>'}
+              ${a.compose?'<span class="tag">compose</span>':''}</div>
+            <div class="path">${esc(a.dir)}</div>
+            <div class="path">${esc(a.repo||'no git remote')} · ${esc(a.branch)}${
+              a.commit?' · '+esc(a.commit):''}${a.domain?' · '+esc(a.domain):''}</div>
+          </div>
+        </label>`).join('')}
+    </div>
+    <div class="err" id="err"></div>
+    <div class="foot">
+      <button class="btn sm" onclick="tickAll(true)">All</button>
+      <button class="btn sm" onclick="tickAll(false)">None</button>
+      <div class="grow"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="importScan('${esc(s)}')">Import</button>
+    </div>`, 'wide');
+}
+function tickAll(v){ document.querySelectorAll('.scan input').forEach(c=>c.checked=v); }
+async function importScan(s){
+  const pick = [...document.querySelectorAll('.scan input:checked')].map(c=>found[c.dataset.i]);
+  if(!pick.length) return $('err').textContent='Nothing selected.';
+  const r = await pywebview.api.import_apps(s, pick);
+  closeModal(); toast(`${r.added} added, ${r.updated} updated`); await boot();
+}
+
+/* apps */
+function appModal(name){
+  const a = name ? S.apps[name] : {branch:'main', server:sv};
+  const opts = Object.keys(S.servers).map(s =>
+    `<option ${a.server===s?'selected':''}>${esc(s)}</option>`).join('');
+  if(!opts) return toast('Add a server first', true);
+  openModal(`
+    <h2>${name?'Edit app':'Add an app'}</h2>
+    <div class="f"><label>App name</label>
+      <input id="a_name" value="${esc(name||'')}" placeholder="myapp"
+             oninput="if(!$('a_dir').dataset.touched)$('a_dir').value='/opt/'+this.value"></div>
+    <div class="f"><label>Server</label><select id="a_server">${opts}</select></div>
+    <div class="f"><label>Git repository</label>
+      <input id="a_repo" value="${esc(a.repo||'')}" placeholder="https://github.com/you/myapp"></div>
+    <div class="f" style="display:flex;gap:10px">
+      <div style="flex:1"><label>Branch</label><input id="a_branch" value="${esc(a.branch||'main')}"></div>
+      <div style="flex:2"><label>Path on server</label>
+        <input id="a_dir" value="${esc(a.dir||'')}" onfocus="this.dataset.touched=1"></div>
+    </div>
+    <div class="f"><label>Custom command <span style="color:var(--faint)">(optional)</span></label>
+      <input id="a_cmd" value="${esc(a.cmd||'')}" placeholder="leave empty">
+      <div class="hint">Empty = clone if missing, reset to origin, run <code>deploy/deploy.sh</code>.
+        First deploy and every redeploy take the same path.</div></div>
+    <div class="err" id="err"></div>
+    <div class="foot">
+      ${name?`<button class="btn danger" onclick="delApp('${esc(name)}')">Delete</button>`:''}
+      <div class="grow"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="saveApp('${esc(name||'')}')">Save</button>
+    </div>`);
+}
+async function saveApp(old){
+  if(!val('a_name')) return $('err').textContent='Name is required.';
+  if(!val('a_cmd') && !val('a_repo'))
+    return $('err').textContent='Repository is required (or give a custom command).';
+  const r = await pywebview.api.save_app(old, val('a_name'), {
+    server:$('a_server').value, repo:val('a_repo'), branch:val('a_branch')||'main',
+    dir:val('a_dir')||('/opt/'+val('a_name')), cmd:val('a_cmd')});
+  if(!r.ok) return $('err').textContent = r.msg;
+  sv = $('a_server').value; closeModal(); toast('App saved'); await boot();
+}
+function delApp(n){
+  openModal(`<h2>Remove ${esc(n)}?</h2>
+    <p style="color:var(--dim);margin:0 0 4px">Removes it from this console only.
+      Nothing on the server is touched.</p>
+    <div class="foot"><div class="grow"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn danger" onclick="delAppGo('${esc(n)}')">Remove</button></div>`);
+}
+async function delAppGo(n){
+  await pywebview.api.delete_app(n); closeModal(); toast('App removed'); await boot();
+}
+
+document.onkeydown = e => { if(e.key==='Escape') closeModal(); };
+
+// The ready event may already have fired before this script runs — cover both.
+if (window.pywebview && window.pywebview.api) boot();
+else window.addEventListener('pywebviewready', boot);
+</script>
+</body>
+</html>

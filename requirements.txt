@@ -1,0 +1,7 @@
+# Runtime
+pywebview>=5.0        # native window; add an extra on Linux, see README
+# Linux only: pip install "pywebview[gtk]"   (or "pywebview[qt]")
+
+# Build an executable (optional)
+pyinstaller>=6.0
+pillow>=10.0          # only for make_icon.py

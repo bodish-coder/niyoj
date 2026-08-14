@@ -1,0 +1,21 @@
+# Your servers, hosts and key paths live here. Never commit it.
+apps.json
+*.apps.json
+
+# Build output
+build/
+dist/
+*.spec
+*.exe
+*.app/
+*.dmg
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
