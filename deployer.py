@@ -27,7 +27,8 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 def load_cfg():
     if not CFG.exists():
         CFG.write_text(json.dumps({"servers": {}, "apps": {}}, indent=2), encoding="utf-8")
-    cfg = json.loads(CFG.read_text(encoding="utf-8"))
+    # utf-8-sig: an editor (or PowerShell) may have left a BOM — plain utf-8 chokes on it
+    cfg = json.loads(CFG.read_text(encoding="utf-8-sig"))
     cfg.setdefault("servers", {})
     cfg.setdefault("apps", {})
     return cfg
@@ -148,6 +149,8 @@ def ssh_run(server, script, on_line):
         text=True, bufsize=1, encoding="utf-8", errors="replace",
         creationflags=NO_WINDOW,
     )
+    # Windows text mode would turn every \n into \r\n and bash chokes on the \r
+    p.stdin.reconfigure(newline="\n")
     p.stdin.write(script + "\n")
     p.stdin.close()
     for line in p.stdout:
@@ -335,6 +338,28 @@ def main():
 
 
 def selftest():
+    global CFG
+    real, tmp = CFG, Path(os.environ.get("TEMP", ".")) / "niyoj_selftest.json"
+    tmp.write_text("\ufeff" + json.dumps({"servers": {"a": {}}}), encoding="utf-8")
+    CFG = tmp
+    try:
+        assert load_cfg()["servers"] == {"a": {}}, "config with a BOM must still load"
+    finally:
+        CFG = real
+        tmp.unlink()
+
+    # the script must reach the remote shell with LF only — a stray \r kills bash
+    global ssh_argv
+    real = ssh_argv
+    ssh_argv = lambda _s: [sys.executable, "-c",
+                           "import sys; sys.stdout.write(repr(sys.stdin.read()))"]
+    got = []
+    try:
+        ssh_run({}, "line1\nline2", got.append)
+    finally:
+        ssh_argv = real
+    assert "\\r" not in "".join(got), f"CRLF reached the shell: {''.join(got)}"
+
     s = remote_script({"dir": "/opt/x", "repo": "git@h:o/x", "branch": "dev"})
     assert "git clone -b dev git@h:o/x /opt/x" in s
     assert "git reset --hard origin/dev" in s and "sudo bash deploy/deploy.sh" in s

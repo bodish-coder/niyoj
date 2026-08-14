@@ -189,6 +189,8 @@ function toast(msg, bad){
   const t=$('toast'); t.textContent=msg; t.className='show'+(bad?' bad':'');
   clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2800);
 }
+// a Python-side exception rejects the api promise; without this it fails silently
+window.addEventListener('unhandledrejection', e => toast('Error: '+e.reason, true));
 
 async function boot(){
   S = await pywebview.api.get_state();
@@ -398,9 +400,10 @@ async function testServer(){
 }
 async function saveServer(old){
   if(!val('s_name')||!val('s_host')) return $('err').textContent='Name and host are required.';
-  const r = await pywebview.api.save_server(old, val('s_name'), formServer());
+  const name = val('s_name');
+  const r = await pywebview.api.save_server(old, name, formServer());
   if(!r.ok) return $('err').textContent = r.msg;
-  closeModal(); sv = val('s_name'); toast('Server saved'); await boot();
+  closeModal(); sv = name; toast('Server saved'); await boot();   // read name before the modal DOM is gone
 }
 async function delServer(name){
   const used = appsOf(name).length;
