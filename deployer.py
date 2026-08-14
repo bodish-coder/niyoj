@@ -193,8 +193,9 @@ class Api:
         if not old and name in cfg["apps"]:
             return {"ok": False, "msg": "An app with that name already exists."}
         data = {k: v for k, v in data.items() if v not in ("", None)}
-        if old in cfg["apps"] and "last" in cfg["apps"][old]:
-            data["last"] = cfg["apps"][old]["last"]     # keep deploy history on edit
+        for k in ("last", "commit"):                    # not in the form; keep on edit
+            if k in cfg["apps"].get(old, {}):
+                data.setdefault(k, cfg["apps"][old][k])
         cfg["apps"] = rename_key(cfg["apps"], old, name, data)
         save_cfg(cfg)
         return {"ok": True}
@@ -269,7 +270,8 @@ class Api:
         added = updated = 0
         for r in rows:
             entry = {"server": server_name, "repo": r.get("repo", ""),
-                     "branch": r.get("branch") or "main", "dir": r["dir"]}
+                     "branch": r.get("branch") or "main", "dir": r["dir"],
+                     "commit": r.get("commit", "")}      # last commit date, refreshed by each scan
             cur = cfg["apps"].get(r["name"])
             if cur and cur.get("dir") == r["dir"]:
                 cur.update({k: v for k, v in entry.items() if v})

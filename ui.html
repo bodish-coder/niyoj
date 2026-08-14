@@ -273,6 +273,7 @@ function cards(){
       <div class="meta">
         <div title="${esc(a.dir)}">${esc(a.dir||'—')}</div>
         <div title="${esc(a.repo)}">${esc(a.repo||'no repo set')}</div>
+        ${a.commit?`<div>last commit ${esc(a.commit)} on ${esc(a.branch||'main')}</div>`:''}
       </div>
       <div class="st ${cls}">${esc(txt)}</div>
       <div class="row">
