@@ -1,4 +1,7 @@
-"""Generate niyoj.ico — upload arrow over a server bar, on a gradient tile.
+"""Generate niyoj.ico — a terminal prompt on a gradient tile.
+
+A console chevron and cursor bar: says "shell on a remote box" rather than
+the generic upload arrow, and both shapes stay readable down to 16px.
 
 Run once (or after tweaking colours): python make_icon.py
 """
@@ -24,13 +27,18 @@ icon.paste(grad, (0, 0), mask)
 
 d = ImageDraw.Draw(icon)
 W = (255, 255, 255, 255)
-d.rounded_rectangle([456, 296, 568, 688], radius=56, fill=W)          # arrow stem
-d.line([(288, 516), (512, 292), (736, 516)], fill=W, width=112, joint="curve")
-for cx, cy in ((288, 516), (736, 516)):                               # round the caps
-    d.ellipse([cx - 56, cy - 56, cx + 56, cy + 56], fill=W)
-d.rounded_rectangle([264, 764, 760, 872], radius=54, fill=W)          # server bar
+STROKE = 116                                   # thick enough to hold at 16px
 
-icon.save("niyoj.ico", sizes=[(256, 256), (128, 128), (64, 64),
-                                 (48, 48), (32, 32), (16, 16)])
+# ">" prompt chevron
+d.line([(272, 320), (520, 512), (272, 704)], fill=W, width=STROKE, joint="curve")
+for cx, cy in ((272, 320), (520, 512), (272, 704)):          # round every cap/elbow
+    d.ellipse([cx - STROKE // 2, cy - STROKE // 2,
+               cx + STROKE // 2, cy + STROKE // 2], fill=W)
+
+# cursor bar, sitting on the prompt's baseline
+d.rounded_rectangle([596, 646, 792, 762], radius=58, fill=W)
+
+icon.save("niyoj.ico", sizes=[(256, 256), (128, 128), (64, 64), (48, 48),
+                              (40, 40), (32, 32), (24, 24), (20, 20), (16, 16)])
 icon.resize((512, 512), Image.LANCZOS).save("logo.png")
 print("wrote niyoj.ico + logo.png")

@@ -18,7 +18,26 @@ from pathlib import Path
 # ponytail: frozen exe unpacks to a temp dir, so anchor config next to the exe
 ROOT = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
 BUNDLE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-CFG = ROOT / "apps.json"
+
+
+def _cfg_path():
+    """Beside the exe, unless that folder is read-only (installed under
+    Program Files) — then per-user, so settings never fail to save."""
+    beside = ROOT / "apps.json"
+    if beside.exists():
+        return beside
+    probe = ROOT / ".niyoj-write-test"
+    try:
+        probe.touch()
+        probe.unlink()
+        return beside
+    except OSError:
+        d = Path(os.environ.get("APPDATA", ROOT)) / "NiYoj"
+        d.mkdir(parents=True, exist_ok=True)
+        return d / "apps.json"
+
+
+CFG = _cfg_path()
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
