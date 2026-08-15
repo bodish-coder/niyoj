@@ -7,10 +7,9 @@ Run:  python deployer.py          (or deployer.exe)
 Native WebView2 window (pywebview). Everything is configured in the UI;
 apps.json next to the exe is just where it lands.
 
-Copyright (C) 2026 bodish-coder.  Licensed under the GNU Affero General
-Public License v3.0 or later — see LICENSE.  This program comes with
-ABSOLUTELY NO WARRANTY; any modified or hosted version must ship its
-complete source under the same licence.
+Copyright (C) 2026 bodish-coder.  All rights reserved.  Source is public
+for reading only — no licence is granted to use, copy, modify or
+distribute this code.
 """
 import json
 import os

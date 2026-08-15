@@ -158,6 +158,8 @@ Run the self-check with `python3 deployer.py --selftest`.
 
 ## Licence
 
-[GNU AGPL-3.0-or-later](LICENSE). Use it, change it, run it — but anything you
-distribute or host built on this code must ship its complete source under the
-same licence. No closed-source forks, no proprietary rebrands.
+**None.** Copyright (C) 2026 bodish-coder, all rights reserved.
+
+The source is public so you can read it and judge it before running the
+installer. It is *not* open source: no permission is granted to use, copy,
+modify or redistribute this code. Want to use it? Ask.
