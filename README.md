@@ -153,6 +153,11 @@ or copied by NiYoj; it only passes the path to `ssh -i`.
 | `ui.html` | The whole interface — layout, CSS, JS |
 | `apps.json` | Your servers and apps (created on first run, gitignored) |
 | `build.cmd` / `build.sh` | Build a binary for Windows / macOS / Linux |
-| `make_icon.py` | Regenerates the icon |
 
 Run the self-check with `python3 deployer.py --selftest`.
+
+## Licence
+
+[GNU AGPL-3.0-or-later](LICENSE). Use it, change it, run it — but anything you
+distribute or host built on this code must ship its complete source under the
+same licence. No closed-source forks, no proprietary rebrands.

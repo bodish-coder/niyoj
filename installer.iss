@@ -1,11 +1,11 @@
-; NiYoj installer — ships the built exe only, no source.
+; NiYoj installer - ships the built exe only, no source.
 ; Build:  "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 ; Output: dist\niyoj-setup-<version>.exe
 ;
 ; Per-user install (no admin prompt); apps.json then sits next to the exe.
 
 #define AppName    "NiYoj"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppExe     "niyoj.exe"
 
 [Setup]
@@ -26,6 +26,11 @@ UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+VersionInfoVersion={#AppVersion}
+; Update in place: shut the running app, keep apps.json / logs already in {app}.
+CloseApplications=yes
+RestartApplications=no
+UsePreviousAppDir=yes
 
 [Tasks]
 Name: desktopicon; Description: "Create a &desktop shortcut"; Flags: unchecked
@@ -41,5 +46,5 @@ Name: "{userdesktop}\{#AppName}";     Filename: "{app}\{#AppExe}"; Tasks: deskto
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
-; apps.json (your servers and apps) is left behind on uninstall on purpose —
+; apps.json (your servers and apps) is left behind on uninstall on purpose -
 ; reinstalling keeps your setup. Delete {app} by hand to be rid of it.
