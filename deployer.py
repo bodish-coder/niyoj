@@ -87,7 +87,24 @@ def remote_script(app):
         "git fetch --all --prune",
         f"git reset --hard origin/{br}",
         "git submodule update --init --recursive || true",
-        "sudo bash deploy/deploy.sh",
+        # a static site checkout has no deploy.sh — the pull above is the whole deploy
+        "if [ -f deploy/deploy.sh ]; then sudo bash deploy/deploy.sh;"
+        " else echo 'no deploy/deploy.sh — files updated in place'; fi",
+    ])
+
+
+def prep_script(dest):
+    return f"set -e; rm -rf {dest}.new {dest}.old; mkdir -p {dest}.new"
+
+
+def swap_script(dest):
+    """Only swap once the upload landed, so a half-sent site never goes live."""
+    return "\n".join([
+        "set -e",
+        f"if [ -d {dest} ]; then mv {dest} {dest}.old; fi",
+        f"mv {dest}.new {dest}",
+        f"rm -rf {dest}.old",
+        f"echo uploaded to {dest}",
     ])
 
 
@@ -177,6 +194,36 @@ def ssh_run(server, script, on_line):
     return p.wait()
 
 
+def upload_run(server, local, dest, on_line):
+    """Pipe a local folder up as a tarball. ponytail: tar+ssh only — no rsync on Windows."""
+    src = Path(os.path.expandvars(os.path.expanduser(local)))
+    if not src.is_dir():
+        on_line(f"local folder not found: {src}\n")
+        return 2
+    rc = ssh_run(server, prep_script(dest), on_line)
+    if rc:
+        return rc
+    # the tarball needs stdin, so this hop takes its command as argv — kept to bare
+    # words (no quotes, no $) so nothing depends on how ssh re-joins them remotely
+    tar = subprocess.Popen(["tar", "-cf", "-", "-C", str(src), "."],
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           creationflags=NO_WINDOW)
+    p = subprocess.Popen(
+        ssh_argv(server)[:-1] + ["tar", "-C", f"{dest}.new", "-xf", "-"],
+        stdin=tar.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1, encoding="utf-8", errors="replace",
+        creationflags=NO_WINDOW,
+    )
+    tar.stdout.close()                       # so tar sees EPIPE if ssh dies
+    for line in p.stdout:
+        on_line(line)
+    rc = p.wait() or tar.wait()
+    if rc:
+        on_line(f"upload failed (exit {rc}) — {dest} left untouched\n")
+        return rc
+    return ssh_run(server, swap_script(dest), on_line)
+
+
 # ── bridge exposed to the UI ────────────────────────────────────────
 class Api:
     def __init__(self):
@@ -229,6 +276,11 @@ class Api:
         import webview
         r = self.window.create_file_dialog(
             webview.OPEN_DIALOG, directory=os.path.expanduser("~/.ssh"))
+        return r[0] if r else ""
+
+    def pick_dir(self):
+        import webview
+        r = self.window.create_file_dialog(webview.FOLDER_DIALOG)
         return r[0] if r else ""
 
     # -- actions
@@ -319,18 +371,24 @@ class Api:
         app = cfg["apps"][name]
         sv = cfg["servers"][app["server"]]
         emit = lambda s: self._emit(name, s)
-        if not app.get("cmd") and not app.get("repo"):
+        if not app.get("cmd") and not app.get("repo") and not app.get("local"):
             emit(f"=== {name}: no repository set — click Edit and add the Git URL ===\n")
             self.busy.discard(name)
             self.window.evaluate_js(f"deployDone({json.dumps(name)})")
             return
-        script = remote_script(app)
+        upload = app.get("local") and not app.get("cmd") and not app.get("repo")
+        script = remote_script(app) if not upload else ""
         code = 1
         try:
             emit(f"$ ssh {sv.get('user', 'root')}@{sv['host']}  # {name}\n")
-            emit("".join(f"| {ln}\n" for ln in script.splitlines()))
-            emit("-" * 62 + "\n")
-            code = ssh_run(sv, script, emit)
+            if upload:
+                emit(f"| upload {app['local']}  ->  {app['dir']}\n")
+                emit("-" * 62 + "\n")
+                code = upload_run(sv, app["local"], app["dir"], emit)
+            else:
+                emit("".join(f"| {ln}\n" for ln in script.splitlines()))
+                emit("-" * 62 + "\n")
+                code = ssh_run(sv, script, emit)
             emit(f"\n=== {name}: {'OK' if code == 0 else 'FAILED'} (exit {code}) ===\n")
         except Exception as e:
             emit(f"\n=== {name}: ERROR {e} ===\n")
@@ -384,6 +442,34 @@ def selftest():
     s = remote_script({"dir": "/opt/x", "repo": "git@h:o/x", "branch": "dev"})
     assert "git clone -b dev git@h:o/x /opt/x" in s
     assert "git reset --hard origin/dev" in s and "sudo bash deploy/deploy.sh" in s
+    assert "if [ -f deploy/deploy.sh ]" in s, "a site without deploy.sh must not fail"
+
+    # upload: tar the folder locally, unpack it through the real script, compare
+    import shutil
+    assert upload_run({}, "no/such/folder", "/x", lambda l: None) == 2
+    if not shutil.which("bash"):
+        print("selftest ok (upload round-trip skipped: no bash)")
+        return
+    tmpd = Path(os.environ.get("TEMP", ".")) / "niyoj_upload_test"
+    shutil.rmtree(tmpd, ignore_errors=True)
+    dest = tmpd / "dest"
+    (dest / "sub").mkdir(parents=True)
+    (dest / "stale.html").write_text("old", encoding="utf-8")
+    real, cwd = ssh_argv, os.getcwd()
+    ssh_argv = lambda _s: ["bash", "-s"]        # what ssh does: script in on stdin
+    log = []
+    try:
+        os.chdir(tmpd)                          # relative path: bash may be WSL or git-bash
+        assert ssh_run({}, prep_script("dest"), log.append) == 0, "".join(log)
+        (tmpd / "dest.new" / "index.html").write_text("new", encoding="utf-8")
+        assert ssh_run({}, swap_script("dest"), log.append) == 0, "".join(log)
+    finally:
+        ssh_argv, _ = real, os.chdir(cwd)
+    assert (dest / "index.html").read_text() == "new", "upload did not land"
+    assert not (dest / "stale.html").exists(), "old files must not survive the swap"
+    assert not (dest.parent / "dest.old").exists(), "swap left a stale .old behind"
+    shutil.rmtree(tmpd, ignore_errors=True)
+
     assert remote_script({"cmd": "echo hi", "dir": "/o", "repo": "r"}) == "echo hi"
     a = ssh_argv({"host": "1.2.3.4", "user": "deploy", "port": 2222, "key": "~/k"})
     assert a[-1] == "bash -s" and a[-2] == "deploy@1.2.3.4"

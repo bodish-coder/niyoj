@@ -382,6 +382,7 @@ function formServer(){
           port:parseInt(val('s_port')||'22',10)||22, key:val('s_key')};
 }
 async function pickKey(){ const p = await pywebview.api.pick_key(); if(p) $('s_key').value = p; }
+async function pickDir(){ const p = await pywebview.api.pick_dir(); if(p) $('a_local').value = p; }
 
 async function testForm(name){
   if(!val('s_host')) return $('err').textContent='Enter a host first.';
@@ -481,10 +482,15 @@ function appModal(name){
       <div style="flex:2"><label>Path on server</label>
         <input id="a_dir" value="${esc(a.dir||'')}" onfocus="this.dataset.touched=1"></div>
     </div>
+    <div class="f"><label>Local folder to upload <span style="color:var(--faint)">(static site — instead of a repo)</span></label>
+      <div class="with"><input id="a_local" value="${esc(a.local||'')}" placeholder="C:\\sites\\bodish.in\\out">
+        <button class="btn" onclick="pickDir()">Browse</button></div>
+      <div class="hint">Set this and leave the repo empty: the folder is uploaded to
+        the path on the server, replacing what's there.</div></div>
     <div class="f"><label>Custom command <span style="color:var(--faint)">(optional)</span></label>
       <input id="a_cmd" value="${esc(a.cmd||'')}" placeholder="leave empty">
-      <div class="hint">Empty = clone if missing, reset to origin, run <code>deploy/deploy.sh</code>.
-        First deploy and every redeploy take the same path.</div></div>
+      <div class="hint">Empty = clone if missing, reset to origin, run <code>deploy/deploy.sh</code>
+        if the repo has one. First deploy and every redeploy take the same path.</div></div>
     <div class="err" id="err"></div>
     <div class="foot">
       ${name?`<button class="btn danger" onclick="delApp('${esc(name)}')">Delete</button>`:''}
@@ -495,11 +501,11 @@ function appModal(name){
 }
 async function saveApp(old){
   if(!val('a_name')) return $('err').textContent='Name is required.';
-  if(!val('a_cmd') && !val('a_repo'))
-    return $('err').textContent='Repository is required (or give a custom command).';
+  if(!val('a_cmd') && !val('a_repo') && !val('a_local'))
+    return $('err').textContent='Repository is required (or a local folder, or a custom command).';
   const r = await pywebview.api.save_app(old, val('a_name'), {
     server:$('a_server').value, repo:val('a_repo'), branch:val('a_branch')||'main',
-    dir:val('a_dir')||('/opt/'+val('a_name')), cmd:val('a_cmd')});
+    dir:val('a_dir')||('/opt/'+val('a_name')), cmd:val('a_cmd'), local:val('a_local')});
   if(!r.ok) return $('err').textContent = r.msg;
   sv = $('a_server').value; closeModal(); toast('App saved'); await boot();
 }
