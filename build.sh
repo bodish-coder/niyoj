@@ -3,6 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+python3 deployer.py --bump          # every build gets a fresh version
+python3 deployer.py --scripts       # refresh the copy the android app ships
+
 EXTRA=()
 if [[ "$(uname -s)" == "Darwin" ]]; then
   EXTRA+=(--windowed)            # .app bundle, no terminal behind it

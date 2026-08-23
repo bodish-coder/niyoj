@@ -145,6 +145,45 @@ or copied by NiYoj; it only passes the path to `ssh -i`.
 
 ---
 
+## Android
+
+`android/` is the same app for a phone: `ui.html` runs in a WebView and
+`Bridge.kt` stands in for pywebview's Python API, talking to servers with
+[sshj] instead of the `ssh` binary. There is no second UI and no second copy of
+the deploy scripts — the shell it sends comes from `assets/scripts.json`, which
+`python deployer.py --scripts` writes and the selftest refuses to let go stale.
+
+```
+cd android && build.cmd          # unit tests + release apk
+```
+
+Needs Android Studio (for its JDK 17) and the SDK path in `local.properties`.
+The apk lands in `app/build/outputs/apk/release/`. Without a keystore it is
+signed with the debug key so it still sideloads; for a stable signature:
+
+```
+keytool -genkeypair -keystore android/niyoj.keystore -alias niyoj         -keyalg EC -validity 10000
+gradlew :app:assembleRelease -PniyojKeystorePass=...
+```
+
+Not yet on the phone: the file pickers and the static-folder upload. The app
+reports what it can do through `caps` in `get_state`, and the UI hides the rest.
+
+[sshj]: https://github.com/hierynomus/sshj
+
+## SSH keys
+
+**SSH key** on a server opens the key panel. *Generate* writes an ed25519 key
+with no passphrase (a deploy must never stop to ask); an existing key is reused,
+never overwritten. *Install on server* appends the public half to the server's
+`authorized_keys` over a password login — the one hop a key cannot do itself:
+
+* Windows spawns a console for the password, so it never enters the app;
+* Android asks in-app and hands it straight to sshj, never storing it;
+* anywhere else you get the command to run yourself.
+
+*Verify & save* then reconnects with the key alone and records it on the server.
+
 ## Files
 
 | File | |
@@ -153,6 +192,7 @@ or copied by NiYoj; it only passes the path to `ssh -i`.
 | `ui.html` | The whole interface — layout, CSS, JS |
 | `apps.json` | Your servers and apps (created on first run, gitignored) |
 | `build.cmd` / `build.sh` | Build a binary for Windows / macOS / Linux |
+| `android/` | The same UI as an Android app (Kotlin bridge + sshj) |
 
 Run the self-check with `python3 deployer.py --selftest`.
 

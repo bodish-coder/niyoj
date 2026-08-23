@@ -2,6 +2,8 @@
 REM Rebuild niyoj.exe after editing deployer.py or ui.html.
 cd /d "%~dp0"
 taskkill /IM niyoj.exe /F >nul 2>&1
+python deployer.py --bump || exit /b 1
+python deployer.py --scripts || exit /b 1
 python -m PyInstaller --onefile --noconsole --name niyoj ^
   --icon "%~dp0niyoj.ico" ^
   --add-data "%~dp0ui.html;." ^

@@ -13,11 +13,14 @@ distribute this code.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
+
+VERSION = "1.1.2"   # bumped by --bump on every build; keep the literal on one line
 
 # ponytail: frozen exe unpacks to a temp dir, so anchor config next to the exe
 ROOT = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
@@ -75,6 +78,33 @@ def rename_key(d, old, new, value):
 
 
 # ── ssh ─────────────────────────────────────────────────────────────
+# The remote scripts live here as templates so the Android app can read the exact
+# same text out of scripts.json — one source of truth, two front ends.
+DEPLOY_TPL = "\n".join([
+    "set -euo pipefail",
+    "if [ ! -d {dir}/.git ]; then git clone -b {branch} {repo} {dir}; fi",
+    "cd {dir}",
+    "git fetch --all --prune",
+    "git reset --hard origin/{branch}",
+    "git submodule update --init --recursive || true",
+    # deploy/deploy.sh or a root deploy.sh; a static site has neither, the pull is the deploy
+    "if [ -f deploy/deploy.sh ]; then sudo bash deploy/deploy.sh;"
+    " elif [ -f deploy.sh ]; then sudo bash deploy.sh;"
+    " else echo 'no deploy.sh — files updated in place'; fi",
+])
+
+PREP_TPL = "set -e; rm -rf {dest}.new {dest}.old; mkdir -p {dest}.new"
+
+# Only swap once the upload landed, so a half-sent site never goes live.
+SWAP_TPL = "\n".join([
+    "set -e",
+    "if [ -d {dest} ]; then mv {dest} {dest}.old; fi",
+    "mv {dest}.new {dest}",
+    "rm -rf {dest}.old",
+    "echo uploaded to {dest}",
+])
+
+
 def remote_script(app):
     """Clone-if-missing, hard-reset to origin, run the repo's own deploy.sh.
 
@@ -83,33 +113,16 @@ def remote_script(app):
     """
     if app.get("cmd"):
         return app["cmd"]
-    d, repo, br = app["dir"], app["repo"], app.get("branch", "main")
-    return "\n".join([
-        "set -euo pipefail",
-        f"if [ ! -d {d}/.git ]; then git clone -b {br} {repo} {d}; fi",
-        f"cd {d}",
-        "git fetch --all --prune",
-        f"git reset --hard origin/{br}",
-        "git submodule update --init --recursive || true",
-        # a static site checkout has no deploy.sh — the pull above is the whole deploy
-        "if [ -f deploy/deploy.sh ]; then sudo bash deploy/deploy.sh;"
-        " else echo 'no deploy/deploy.sh — files updated in place'; fi",
-    ])
+    return DEPLOY_TPL.format(dir=app["dir"], repo=app["repo"],
+                             branch=app.get("branch", "main"))
 
 
 def prep_script(dest):
-    return f"set -e; rm -rf {dest}.new {dest}.old; mkdir -p {dest}.new"
+    return PREP_TPL.format(dest=dest)
 
 
 def swap_script(dest):
-    """Only swap once the upload landed, so a half-sent site never goes live."""
-    return "\n".join([
-        "set -e",
-        f"if [ -d {dest} ]; then mv {dest} {dest}.old; fi",
-        f"mv {dest}.new {dest}",
-        f"rm -rf {dest}.old",
-        f"echo uploaded to {dest}",
-    ])
+    return SWAP_TPL.format(dest=dest)
 
 
 def ssh_argv(server):
@@ -143,7 +156,7 @@ for r in /opt /srv /var/www /root /home; do
     repo=$(git -C "$d" config --get remote.origin.url 2>/dev/null)
     br=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null)
     when=$(git -C "$d" log -1 --format=%cd --date=short 2>/dev/null)
-    ds=0; [ -f "$d/deploy/deploy.sh" ] && ds=1
+    ds=0; { [ -f "$d/deploy/deploy.sh" ] || [ -f "$d/deploy.sh" ]; } && ds=1
     dc=0; for f in "$d"/docker-compose*.y*ml "$d"/compose*.y*ml; do [ -f "$f" ] && dc=1; done
     up=0; case " $running " in *" $n "*) up=1;; esac
     dom=""
@@ -228,6 +241,65 @@ def upload_run(server, local, dest, on_line):
     return ssh_run(server, swap_script(dest), on_line)
 
 
+# ── ssh keys ────────────────────────────────────────────────────────
+# The comment is the only free text that reaches the remote shell, so no quotes
+# in it — then single-quoting the whole key below is airtight.
+PUB_RE = re.compile(
+    r"^(?:ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp\d+) [A-Za-z0-9+/=]+(?: [^\r\n'\"]*)?$")
+
+
+PROBE = ("uname -sr; command -v git >/dev/null && git --version | head -1 "
+         "|| echo 'git MISSING'")
+
+AUTHZ_TPL = ("set -e; umask 077; mkdir -p ~/.ssh; "
+             "grep -qxF '{pub}' ~/.ssh/authorized_keys 2>/dev/null || "
+             "echo '{pub}' >> ~/.ssh/authorized_keys; "
+             "chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; echo NIYOJ_KEY_OK")
+
+
+def authz_script(pub):
+    """One line, because Windows hands it to ssh as a single quoted argv word."""
+    pub = pub.strip()
+    if not PUB_RE.match(pub):
+        raise ValueError("that is not an OpenSSH public key")
+    return AUTHZ_TPL.format(pub=pub)
+
+
+def password_argv(server, script):
+    """Same host as ssh_argv, but password-only — this is the one hop that runs
+    before the key exists, so it must NOT fall back to a key and must have a tty."""
+    return [
+        "ssh",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "PreferredAuthentications=password,keyboard-interactive",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-p", str(server.get("port", 22)),
+        f"{server.get('user', 'root')}@{server['host']}",
+        script,
+    ]
+
+
+def gen_key(path=None, comment="niyoj"):
+    """ed25519, no passphrase (deploys must never prompt). Never overwrites an
+    existing key — that would lock you out of every server at once."""
+    priv = Path(os.path.expandvars(os.path.expanduser(path or "~/.ssh/id_ed25519")))
+    pub = Path(str(priv) + ".pub")
+    if priv.exists():
+        return {"ok": True, "existed": True, "path": str(priv),
+                "pub": pub.read_text(encoding="utf-8").strip() if pub.exists() else ""}
+    priv.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        r = subprocess.run(
+            ["ssh-keygen", "-t", "ed25519", "-f", str(priv), "-N", "", "-C", comment],
+            capture_output=True, text=True, creationflags=NO_WINDOW)
+    except FileNotFoundError:
+        return {"ok": False, "msg": "ssh-keygen not found — install OpenSSH"}
+    if r.returncode:
+        return {"ok": False, "msg": (r.stderr or r.stdout or "ssh-keygen failed").strip()}
+    return {"ok": True, "existed": False, "path": str(priv),
+            "pub": pub.read_text(encoding="utf-8").strip()}
+
+
 # ── bridge exposed to the UI ────────────────────────────────────────
 class Api:
     def __init__(self):
@@ -236,7 +308,9 @@ class Api:
 
     # -- read/write config
     def get_state(self):
-        return load_cfg()
+        return dict(load_cfg(), version=VERSION,
+                    caps={"pick": True, "upload": True,
+                          "install_key": "console" if os.name == "nt" else "manual"})
 
     def save_server(self, old, name, data):
         cfg = load_cfg()
@@ -287,6 +361,49 @@ class Api:
         r = self.window.create_file_dialog(webview.FOLDER_DIALOG)
         return r[0] if r else ""
 
+    def read_key(self, path=None):
+        """Look, don't create — opening the key dialog must not mint a key."""
+        pub = Path(os.path.expandvars(os.path.expanduser(
+            (path or "~/.ssh/id_ed25519") + ".pub")))
+        return pub.read_text(encoding="utf-8").strip() if pub.exists() else ""
+
+    def gen_key(self, path=None):
+        return gen_key(path or "~/.ssh/id_ed25519")
+
+    def install_key(self, server, key_path=None, password=None):
+        """Push the public key using a password — the only step a key can't do.
+        Desktop has no password field: a console we spawn collects it, so it never
+        enters the app. `password` exists for the Android bridge, which uses sshj."""
+        if not server or not server.get("host"):
+            return {"ok": False, "msg": "No host given"}
+        k = gen_key(key_path or server.get("key") or "~/.ssh/id_ed25519")
+        if not k["ok"]:
+            return k
+        if not k["pub"]:
+            return {"ok": False, "msg": f"{k['path']}.pub is missing"}
+        try:
+            argv = password_argv(server, authz_script(k["pub"]))
+        except ValueError as e:
+            return {"ok": False, "msg": str(e)}
+        line = " ".join(a if a.startswith("-") or "@" in a or a.isdigit() or a == "ssh"
+                        else f'"{a}"' for a in argv)
+        if os.name != "nt":
+            return {"ok": True, "how": "manual", "cmd": line, "pub": k["pub"], "path": k["path"]}
+        bat = Path(os.environ.get("TEMP", ".")) / "niyoj-install-key.cmd"
+        bat.write_text("\r\n".join([
+            "@echo off",
+            "title NiYoj - install SSH key",
+            f"echo Installing {k['path']}.pub on {server['host']}",
+            "echo Type the server password when asked.",
+            "echo.",
+            line,
+            "echo.",
+            "pause",
+            "",
+        ]), encoding="utf-8")
+        os.startfile(bat)          # its own console window, so ssh gets a real tty
+        return {"ok": True, "how": "console", "pub": k["pub"], "path": k["path"]}
+
     # -- actions
     def test_conn(self, server, name=None):
         """Test a server dict straight from the form — no save needed first.
@@ -294,10 +411,8 @@ class Api:
         if not server or not server.get("host"):
             return {"ok": False, "msg": "No host given"}
         out = []
-        probe = ("uname -sr; command -v git >/dev/null && git --version | head -1 "
-                 "|| echo 'git MISSING'")
         try:
-            code = ssh_run(server, probe, out.append)
+            code = ssh_run(server, PROBE, out.append)
         except FileNotFoundError:
             return {"ok": False, "msg": "ssh not found on this PC"}
         except Exception as e:
@@ -412,12 +527,74 @@ def main():
     import webview
     api = Api()
     api.window = webview.create_window(
-        "NiYoj",
+        f"NiYoj {VERSION}",
         html=(BUNDLE / "ui.html").read_text(encoding="utf-8"),
         js_api=api, width=1140, height=720, min_size=(880, 560),
         background_color="#0b0f16",
     )
     webview.start()
+
+
+_VER_RE = {
+    "deployer.py": re.compile(r'(?m)^(VERSION = ")(\d+)\.(\d+)\.(\d+)(")'),
+    "installer.iss": re.compile(r'(?m)^(#define AppVersion ")(\d+)\.(\d+)\.(\d+)(")'),
+    "android/app/build.gradle.kts":
+        re.compile(r'(?m)^(\s*versionName = ")(\d+)\.(\d+)\.(\d+)(")'),
+}
+
+
+def next_version(major, minor, patch, part="patch"):
+    if part == "major":
+        return f"{major + 1}.0.0"
+    if part == "minor":
+        return f"{major}.{minor + 1}.0"
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def bump(part="patch"):
+    """Raise the version in deployer.py and installer.iss so no two builds ever
+    ship the same version. Called by build.cmd / build.sh."""
+    here = Path(__file__).resolve().parent
+    new = None
+    for name, rx in _VER_RE.items():
+        f = here / name
+        if not f.exists():                      # the android project is optional
+            continue
+        old = f.read_text(encoding="utf-8")
+        m = rx.search(old)
+        if not m:
+            raise SystemExit(f"no version literal found in {name}")
+        new = next_version(int(m[2]), int(m[3]), int(m[4]), part)
+        f.write_text(old[:m.start()] + m[1] + new + m[5] + old[m.end():],
+                     encoding="utf-8", newline="")
+    # Play refuses a repeat versionCode, so derive one that only ever climbs
+    g = here / "android/app/build.gradle.kts"
+    if g.exists() and new:
+        maj, mi, pa = (int(x) for x in new.split("."))
+        g.write_text(re.sub(r"(?m)^(\s*versionCode = )\d+",
+                            lambda m: m[1] + str(maj * 10000 + mi * 100 + pa),
+                            g.read_text(encoding="utf-8")),
+                     encoding="utf-8", newline="")
+    print(new)
+    return new
+
+
+SCRIPTS_JSON = (Path(__file__).resolve().parent
+                / "android/app/src/main/assets/scripts.json")
+
+
+def scripts_blob():
+    """Every line of shell we send to a server. The Android app ships this file
+    verbatim, so the two front ends can never drift apart."""
+    return json.dumps({"deploy": DEPLOY_TPL, "prep": PREP_TPL, "swap": SWAP_TPL,
+                       "authz": AUTHZ_TPL, "scan": SCAN_SCRIPT, "probe": PROBE},
+                      indent=2) + chr(10)
+
+
+def dump_scripts():
+    SCRIPTS_JSON.parent.mkdir(parents=True, exist_ok=True)
+    SCRIPTS_JSON.write_text(scripts_blob(), encoding="utf-8", newline="")
+    print(SCRIPTS_JSON)
 
 
 def selftest():
@@ -446,7 +623,7 @@ def selftest():
     s = remote_script({"dir": "/opt/x", "repo": "git@h:o/x", "branch": "dev"})
     assert "git clone -b dev git@h:o/x /opt/x" in s
     assert "git reset --hard origin/dev" in s and "sudo bash deploy/deploy.sh" in s
-    assert "if [ -f deploy/deploy.sh ]" in s, "a site without deploy.sh must not fail"
+    assert "no deploy.sh" in s, "a site without deploy.sh must not fail"
 
     # upload: tar the folder locally, unpack it through the real script, compare
     import shutil
@@ -492,11 +669,42 @@ def selftest():
     assert rows[1]["branch"] == "main" and not rows[1]["compose"]
     assert parse_scan("no marker") == []
     assert (BUNDLE / "ui.html").exists(), "ui.html missing"
+    for name, rx in _VER_RE.items():
+        f = Path(__file__).resolve().parent / name
+        if f.exists():
+            assert rx.search(f.read_text(encoding="utf-8")),                 f"--bump would not find the version in {name}"
+    assert next_version(1, 2, 9) == "1.2.10"
+    assert next_version(1, 2, 9, "minor") == "1.3.0"
+    assert next_version(1, 2, 9, "major") == "2.0.0"
+
+    # a key line is single-quoted into a remote shell: nothing may escape it
+    pub = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIabc+/de= niyoj"
+    a = authz_script(pub)
+    assert a.count("\n") == 0, "authz must stay one line for the Windows console hop"
+    assert f"'{pub}'" in a and "NIYOJ_KEY_OK" in a
+    for bad in ("ssh-ed25519 AAA'; rm -rf / #", "not-a-key AAAA", "ssh-ed25519 A#B c",
+                'ssh-ed25519 AAAA "x"'):
+        try:
+            authz_script(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"authz_script accepted {bad!r}")
+    if SCRIPTS_JSON.exists():        # the phone reads this copy — it must be current
+        assert SCRIPTS_JSON.read_text(encoding="utf-8") == scripts_blob(),             "android scripts.json is stale — run: python deployer.py --scripts"
+    assert password_argv({"host": "h", "port": 2222}, "x")[-1] == "x"
+    assert "PubkeyAuthentication=no" in password_argv({"host": "h"}, "x")
+
     print("selftest ok")
 
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         selftest()
+    elif "--scripts" in sys.argv:
+        dump_scripts()
+    elif "--bump" in sys.argv:
+        rest = sys.argv[sys.argv.index("--bump") + 1:]
+        bump(rest[0] if rest else "patch")
     else:
         main()
