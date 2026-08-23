@@ -8,7 +8,9 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bodish.niyoj"
+        // the id the device and Play know it by; the Kotlin package stays
+        // com.* because `in` is a Kotlin keyword and would need backticks
+        applicationId = "in.bodish.niyoj"
         minSdk = 26                  // java.util.Base64 + the TLS stack sshj expects
         targetSdk = 35
         versionCode = 1
