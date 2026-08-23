@@ -35,6 +35,7 @@
   .btn.pri:hover{background:#4ae3f7}
   .btn.danger:hover{background:#2a1418;border-color:#5b2630;color:var(--red)}
   .btn.sm{padding:4px 10px;font-size:12.5px}
+  .burger{display:none;font-size:15px;line-height:1.2;padding:6px 11px}
 
   main{flex:1;display:flex;min-height:0}
   aside{width:250px;flex:none;background:var(--panel2);border-right:1px solid var(--line);
@@ -157,6 +158,8 @@
     .modal{width:min(430px,94vw);padding:16px}
     .modal.wide{width:min(620px,94vw)}
     .btn{padding:8px 12px}
+    .burger{display:block}
+    .hdr-act{display:none}
   }
 
   #toast{position:fixed;bottom:18px;left:50%;transform:translate(-50%,60px);z-index:99;
@@ -174,8 +177,9 @@
     NiYoj<span class="ver" id="ver"></span>
   </div>
   <div class="grow"></div>
-  <button class="btn" onclick="serverModal()">+ Server</button>
-  <button class="btn" onclick="appModal()">+ App</button>
+  <button class="btn burger" onclick="addMenu()" aria-label="Add">&#9776;</button>
+  <button class="btn hdr-act" onclick="serverModal()">+ Server</button>
+  <button class="btn hdr-act" onclick="appModal()">+ App</button>
 </header>
 
 <main>
@@ -553,6 +557,15 @@ function delApp(n){
 }
 async function delAppGo(n){
   await api.delete_app(n); closeModal(); toast('App removed'); await boot();
+}
+
+function addMenu(){
+  openModal(`<h2>Add</h2>
+    <div class="foot" style="margin-top:0">
+      <button class="btn" onclick="closeModal();serverModal()">+ Server</button>
+      <button class="btn" onclick="closeModal();appModal()">+ App</button>
+      <div class="grow"></div>
+      <button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 
 /* ── ssh key ─────────────────────────────────────── */

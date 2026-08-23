@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 /** The whole app: the desktop ui.html in a WebView, with Bridge standing in for
  *  pywebview's js_api. No second UI to keep in step with the desktop one. */
@@ -21,6 +23,15 @@ class MainActivity : AppCompatActivity() {
             addJavascriptInterface(Bridge(this@MainActivity), "NiYoj")
         }
         setContentView(web)
+        // targetSdk 35 draws edge to edge on Android 15, so the page would sit
+        // under the status bar and the gesture pill without this
+        ViewCompat.setOnApplyWindowInsetsListener(web) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars()
+                    or WindowInsetsCompat.Type.displayCutout())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
         val html = assets.open("ui.html").bufferedReader().use { it.readText() }
         // a named base URL, not about:blank, so the page has a stable origin;
         // nothing is ever fetched from it — the html is passed in whole
