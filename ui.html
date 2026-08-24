@@ -22,8 +22,15 @@
 
   header{
     display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;flex:none;
-    background:var(--panel);border-bottom:1px solid var(--line);
+    background:var(--panel);border-bottom:1px solid var(--line);position:relative;
   }
+  /* explicit width: shrink-to-fit on an absolute child of a flex header comes out
+     nearly half the screen wide */
+  .menu{position:absolute;top:calc(100% + 6px);right:12px;z-index:60;width:172px;
+        background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:5px;box-shadow:0 14px 34px #000b}
+  .menu button{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:7px}
+  .menu button:hover{background:#1a2246}
   .logo{display:flex;align-items:center;gap:9px;font-weight:600}
   .logo .ver{font-weight:400;font-size:11px;opacity:.55}
   .logo img{width:24px;height:24px;display:block;border-radius:7px}
@@ -559,14 +566,22 @@ async function delAppGo(n){
   await api.delete_app(n); closeModal(); toast('App removed'); await boot();
 }
 
+/* a dropdown under the burger, not a modal — it is a menu, it should read as one */
 function addMenu(){
-  openModal(`<h2>Add</h2>
-    <div class="foot" style="margin-top:0">
-      <button class="btn" onclick="closeModal();serverModal()">+ Server</button>
-      <button class="btn" onclick="closeModal();appModal()">+ App</button>
-      <div class="grow"></div>
-      <button class="btn" onclick="closeModal()">Close</button></div>`);
+  if($('menu')) return closeMenu();
+  const m = document.createElement('div');
+  m.className = 'menu'; m.id = 'menu';
+  m.innerHTML = `<button onclick="closeMenu();serverModal()">+ Server</button>
+                 <button onclick="closeMenu();appModal()">+ App</button>`;
+  document.querySelector('header').appendChild(m);
+  // next tick, or the click that opened it closes it again
+  setTimeout(() => document.addEventListener('pointerdown', offMenu), 0);
 }
+function closeMenu(){
+  const m = $('menu'); if(m) m.remove();
+  document.removeEventListener('pointerdown', offMenu);
+}
+function offMenu(e){ if(!e.target.closest('.menu,.burger')) closeMenu(); }
 
 /* ── ssh key ─────────────────────────────────────── */
 async function keyModal(name){
@@ -644,7 +659,7 @@ async function verifyKey(name){
   await boot();
 }
 
-document.onkeydown = e => { if(e.key==='Escape') closeModal(); };
+document.onkeydown = e => { if(e.key==='Escape'){ closeMenu(); closeModal(); } };
 
 // The ready event may already have fired before this script runs — cover both.
 if (window.NiYoj || (window.pywebview && window.pywebview.api)) boot();

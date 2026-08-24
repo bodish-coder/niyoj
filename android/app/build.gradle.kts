@@ -13,8 +13,8 @@ android {
         applicationId = "in.bodish.niyoj"
         minSdk = 26                  // java.util.Base64 + the TLS stack sshj expects
         targetSdk = 35
-        versionCode = 10103
-        versionName = "1.1.3"
+        versionCode = 10105
+        versionName = "1.1.5"
     }
     buildFeatures { buildConfig = true }
     signingConfigs {
