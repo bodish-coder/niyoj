@@ -5,7 +5,7 @@
 ; Per-user install (no admin prompt); apps.json then sits next to the exe.
 
 #define AppName    "NiYoj"
-#define AppVersion "1.1.5"
+#define AppVersion "1.1.6"
 #define AppExe     "niyoj.exe"
 
 [Setup]

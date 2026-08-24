@@ -20,7 +20,7 @@ import threading
 import time
 from pathlib import Path
 
-VERSION = "1.1.5"   # bumped by --bump on every build; keep the literal on one line
+VERSION = "1.1.6"   # bumped by --bump on every build; keep the literal on one line
 
 # ponytail: frozen exe unpacks to a temp dir, so anchor config next to the exe
 ROOT = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
