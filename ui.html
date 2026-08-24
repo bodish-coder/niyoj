@@ -58,9 +58,6 @@
   .sv b{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sv small{color:var(--faint);font:11.5px ui-monospace,Consolas,monospace}
   .sv .n{font-size:11px;color:var(--faint)}
-  .addsv{width:calc(100% - 16px);margin:0 8px 10px;padding:7px;border-radius:8px;
-         border:1px dashed var(--line);color:var(--dim)}
-  .addsv:hover{border-color:#38427a;color:var(--ink)}
 
   .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--faint)}
   .dot.ok{background:var(--accent);box-shadow:0 0 6px #22d3ee66}
@@ -193,7 +190,6 @@
   <aside>
     <div class="cap">Servers</div>
     <div class="servers" id="servers"></div>
-    <button class="addsv" onclick="serverModal()">+ Add server</button>
   </aside>
   <section id="pane"></section>
 </main>
