@@ -1,11 +1,11 @@
-; NiYoj installer - ships the built exe only, no source.
+; NiYoj installer - ships the built app folder, no source.
 ; Build:  "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 ; Output: dist\niyoj-setup-<version>.exe
 ;
 ; Per-user install (no admin prompt); apps.json then sits next to the exe.
 
 #define AppName    "NiYoj"
-#define AppVersion "1.1.6"
+#define AppVersion "1.1.19"
 #define AppExe     "niyoj.exe"
 
 [Setup]
@@ -36,7 +36,7 @@ UsePreviousAppDir=yes
 Name: desktopicon; Description: "Create a &desktop shortcut"; Flags: unchecked
 
 [Files]
-Source: "niyoj.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\niyoj\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "README.md";  DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]

@@ -13,8 +13,8 @@ android {
         applicationId = "in.bodish.niyoj"
         minSdk = 26                  // java.util.Base64 + the TLS stack sshj expects
         targetSdk = 35
-        versionCode = 10106
-        versionName = "1.1.6"
+        versionCode = 10119
+        versionName = "1.1.19"
     }
     buildFeatures { buildConfig = true }
     signingConfigs {
@@ -57,6 +57,7 @@ android {
 // second copy to keep in sync; scripts.json comes from `python deployer.py --scripts`.
 val copyUi by tasks.registering(Copy::class) {
     from(rootProject.file("../ui.html"))
+    from(rootProject.file("../bootstrap-icons.woff2"))
     into(layout.projectDirectory.dir("src/main/assets"))
 }
 tasks.named("preBuild") { dependsOn(copyUi) }

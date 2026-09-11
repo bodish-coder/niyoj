@@ -1130,9 +1130,12 @@ function updateSaMode(){
 
 function genSaPass(){
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+  const max = 256 - (256 % chars.length);   // reject the tail so no char is favoured
   let pwd = '';
-  for(let i=0; i<14; i++){
-    pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  while(pwd.length < 14){
+    for(const n of crypto.getRandomValues(new Uint8Array(14))){
+      if(n < max && pwd.length < 14) pwd += chars.charAt(n % chars.length);
+    }
   }
   const el = $('sa_pw');
   if(el){
